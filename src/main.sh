@@ -11,6 +11,7 @@ PATH_DEFAULTS="${SCRIPT_PARENT}/defaults.cfg"
 
 # IMPORTS
 source "${SCRIPT_DIR}/lib/is_str_in_array.sh"
+source "${SCRIPT_DIR}/lib/log.sh"
 
 function main { # $USER $PPID
 
@@ -36,6 +37,11 @@ function main { # $USER $PPID
 		exit 0	 
 	fi
 
+	log "PAM_TYPE: ${PAM_TYPE}"
+	log "TIMEOUT: ${TIMEOUT}"
+	log "PAM_TTY:${PAM_TTY}"
+	log "---"
+
 	(
 		# Wait for the timeout period
 		sleep ${TIMEOUT}
@@ -45,7 +51,15 @@ function main { # $USER $PPID
 			# Success! User did the action. Clean up the file for next time.
 			rm -f "${CANARY_FILE}"
 		else
-			local session_pids=$(ps -u "${PAM_USER}" -o pid=)
+			# Target processes tied ONLY to the specific terminal assigned to this login
+            if [ -n "${PAM_TTY}" ]; then
+                local session_pids=$(ps -t "${PAM_TTY}" -o pid=)
+            else
+                # Fallback just in case PAM_TTY isn't populated
+                local session_pids=$(ps -u "${PAM_USER}" -o pid=)
+            fi
+
+			log "session_pids: ${session_pids}"
 
 			if [ -n "${session_pids}" ]; then
 				
@@ -60,7 +74,11 @@ function main { # $USER $PPID
                 sleep 3
 
 				# STAGE 2: Check if any processes survived SIGTERM
-                local remaining_pids=$(ps -u "${PAM_USER}" -o pid=)
+                if [ -n "${PAM_TTY}" ]; then
+                    local remaining_pids=$(ps -t "${PAM_TTY}" -o pid=)
+                else
+                    local remaining_pids=$(ps -u "${PAM_USER}" -o pid=)
+                fi
 
 				if [ -n "${remaining_pids}" ]; then
                     # Kill remaining processes
