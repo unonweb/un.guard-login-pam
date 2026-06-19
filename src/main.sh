@@ -62,11 +62,12 @@ function main {
 
 			# SET session_pids
 			local session_pids=""
+			local session_pids_comment
 
 			if [[ -n "${PAM_TTY}" && "${PAM_TTY}" != "ssh" ]]; then
 				# Grab ONLY processes attached to this exact terminal window
 				session_pids=$(ps --tty "${PAM_TTY}" -o pid=)
-				log "PIDs connected to ${PAM_TTY}: $(echo ${session_pids})"
+				session_pids_comment="(connected to TTY: ${PAM_TTY})"
 			fi
 
 			# FALLBACK: Trace down from the specific PAM process tree safely
@@ -74,13 +75,14 @@ function main {
 				# $PPID at this point is the PID of the SSH daemon
 				# Therefore every SSH connection will be terminated
 				session_pids=$(ps --ppid "${PPID}" -o pid=)
-				log "PIDs children of ${PPID}: $(echo ${session_pids})"
+				session_pids_comment="(children of PPID: ${PPID})"
 			fi
 
 			# terminate session
 			if [[ -n "${session_pids}" ]]; then
 				
 				# STAGE 1: SIGTERM (15)
+				log "Terminating PIDs: $(echo ${session_pids}) ${session_pids_comment}"
                 kill -15 ${session_pids} 2>/dev/null
 
 				# Give the processes 3 seconds to catch the signal and exit cleanly
@@ -88,18 +90,21 @@ function main {
 				
 				# STAGE 2: SIGKILL (9)
 				local remaining_pids
+				local remaining_pids_comment
 
                 if [[ -n "${PAM_TTY}" && "${PAM_TTY}" != "ssh" ]]; then
                     remaining_pids=$(ps --tty "${PAM_TTY}" -o pid=)
+					remaining_pids_comment="(connected to TTY: ${PAM_TTY})"
                 fi
 
 				if [[ -z "${remaining_pids}" && -n "${PPID}" ]]; then
                     remaining_pids=$(ps --ppid "${PPID}" -o pid=)
+					remaining_pids_comment="(children of PPID: ${PPID})"
                 fi
 
 				if [ -n "${remaining_pids}" ]; then
                     # Kill remaining processes
-					log "Killing remaining PIDs: $(echo ${remaining_pids})"
+					log "Killing PIDs: $(echo ${remaining_pids}) ${remaining_pids_comment}"
                     kill -9 ${remaining_pids} 2>/dev/null
                 fi
 			fi
