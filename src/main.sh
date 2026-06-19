@@ -66,6 +66,7 @@ function main {
 			if [[ -n "${PAM_TTY}" && "${PAM_TTY}" != "ssh" ]]; then
 				# Grab ONLY processes attached to this exact terminal window
 				session_pids=$(ps --tty "${PAM_TTY}" -o pid=)
+				log "PIDs connected to ${PAM_TTY}: $(echo ${session_pids})"
 			fi
 
 			# FALLBACK: Trace down from the specific PAM process tree safely
@@ -73,10 +74,9 @@ function main {
 				# $PPID at this point is the PID of the SSH daemon
 				# Therefore every SSH connection will be terminated
 				session_pids=$(ps --ppid "${PPID}" -o pid=)
+				log "PIDs children of ${PPID}: $(echo ${session_pids})"
 			fi
 
-			log "session_pids: $(echo ${session_pids})"
-			
 			# terminate session
 			if [[ -n "${session_pids}" ]]; then
 				
