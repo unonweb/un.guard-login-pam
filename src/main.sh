@@ -21,7 +21,7 @@ function main { # $USER $PPID
 	fi
 
 	# SOURCE config / defaults
-	if [[ -r ${PATH_CONFIG} ]]; then
+	if [[ -r "${PATH_CONFIG}" ]]; then
 		source "${PATH_CONFIG}"
 	else
 		source "${PATH_DEFAULTS}"
@@ -34,12 +34,13 @@ function main { # $USER $PPID
 
 	# CHECK user
 	if ! is_str_in_array "${PAM_USER}" "${WATCH_USERS[@]}"; then
-		exit 0	 
+		exit 0
 	fi
 
 	log "PAM_TYPE: ${PAM_TYPE}"
 	log "TIMEOUT: ${TIMEOUT}"
 	log "PAM_TTY:${PAM_TTY}"
+	log "PPID: ${PPID}"
 	log "---"
 
 	(
@@ -50,34 +51,44 @@ function main { # $USER $PPID
 		if [ -f "${CANARY_FILE}" ]; then
 			# Success! User did the action. Clean up the file for next time.
 			rm -f "${CANARY_FILE}"
+			log "RESULT: passed"
 		else
+			log "RESULT: failed"
+			local session_pids=""
+
 			# Target processes tied ONLY to the specific terminal assigned to this login
             if [ -n "${PAM_TTY}" ]; then
-                local session_pids=$(ps -t "${PAM_TTY}" -o pid=)
-            else
-                # Fallback just in case PAM_TTY isn't populated
-                local session_pids=$(ps -u "${PAM_USER}" -o pid=)
+                session_pids=$(ps --tty "${PAM_TTY}" -o pid=)
             fi
 
-			log "session_pids: ${session_pids}"
+			if [[ -z "${session_pids}" ]]; then
+                session_pids=$(ps --user "${PAM_USER}" -o pid=)
+            fi
 
-			if [ -n "${session_pids}" ]; then
+			log "session_pids:\n${session_pids}"
+			log "Processes with parent ${PPID}:\n$(ps --ppid "${PPID}")"
+
+			if [[ -n "${session_pids}" ]]; then
 				
 				# Alert! Send email
 				echo "ALERT: Unauthorized login detected for user '${PAM_USER}' on $(date)" | \
 				mail -s "${MAIL_SUBJECT}" "${MAIL_DST}" 2>/dev/null
 
-				# STAGE 1: Send SIGTERM (15) to request graceful closure
+				# STAGE 1: SIGTERM (15)
                 kill -15 ${session_pids} 2>/dev/null
 
 				# Give the processes 3 seconds to catch the signal and exit cleanly
                 sleep 3
+				
+				# STAGE 2: SIGKILL (9)
+				local remaining_pids
 
-				# STAGE 2: Check if any processes survived SIGTERM
                 if [ -n "${PAM_TTY}" ]; then
-                    local remaining_pids=$(ps -t "${PAM_TTY}" -o pid=)
-                else
-                    local remaining_pids=$(ps -u "${PAM_USER}" -o pid=)
+                    remaining_pids=$(ps --tty "${PAM_TTY}" -o pid=)
+                fi
+
+				if [[ -z "${remaining_pids}" ]]; then
+                    remaining_pids=$(ps --user "${PAM_USER}" -o pid=)
                 fi
 
 				if [ -n "${remaining_pids}" ]; then
