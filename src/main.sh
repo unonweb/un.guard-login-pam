@@ -37,11 +37,11 @@ function main { # $USER $PPID
 		exit 0
 	fi
 
+	log "------"
 	log "PAM_TYPE: ${PAM_TYPE}"
 	log "TIMEOUT: ${TIMEOUT}"
 	log "PAM_TTY:${PAM_TTY}"
 	log "PPID: ${PPID}"
-	log "---"
 
 	(
 		# Wait for the timeout period
@@ -58,15 +58,15 @@ function main { # $USER $PPID
 
 			# Target processes tied ONLY to the specific terminal assigned to this login
             if [ -n "${PAM_TTY}" ]; then
-                session_pids=$(ps --tty "${PAM_TTY}" -o pid=)
+                # session_pids=$(ps --tty "${PAM_TTY}" -o pid=)
+				session_pids=$(ps --ppid "${PPID}" -o pid=)
             fi
 
 			if [[ -z "${session_pids}" ]]; then
                 session_pids=$(ps --user "${PAM_USER}" -o pid=)
             fi
 
-			log "session_pids:\n${session_pids}"
-			log "Processes with parent ${PPID}:\n$(ps --ppid "${PPID}")"
+			log "session_pids:\n$(echo ${session_pids})"
 
 			if [[ -n "${session_pids}" ]]; then
 				
