@@ -1,9 +1,10 @@
 #!/usr/bin/bash
 
 # script location
-SCRIPT_PATH="$(readlink -f "${BASH_SOURCE}")"
+TARGET_FILE="${BASH_SOURCE[0]:-$0}"
+SCRIPT_PATH="$(readlink -f "${TARGET_FILE}")"
 SCRIPT_DIR=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
-SCRIPT_NAME=$(basename -- "$(readlink -f "${BASH_SOURCE}")")
+SCRIPT_DIR=$(dirname -- "${SCRIPT_PATH}")
 SCRIPT_PARENT=$(dirname "${SCRIPT_DIR}")
 
 PATH_CONFIG="${SCRIPT_PARENT}/config.cfg"
@@ -66,7 +67,7 @@ function main { # $USER $PPID
                 session_pids=$(ps --user "${PAM_USER}" -o pid=)
             fi
 
-			log "session_pids:\n$(echo ${session_pids})"
+			log "session_pids: $(echo ${session_pids})"
 
 			if [[ -n "${session_pids}" ]]; then
 				
