@@ -41,7 +41,7 @@ function main {
 	log "PAM_TYPE: ${PAM_TYPE}"
 	log "PAM_USER: ${PAM_USER}"
 	log "PAM_TTY: ${PAM_TTY}"
-	log "PPID: ${PPID}"
+	log "PARENT PROCESS: $(ps --pid ${PPID} -o comm,pid --no-headers)"
 	log "TIMEOUT: ${TIMEOUT}"
 
 	(
@@ -50,31 +50,36 @@ function main {
 
 		# Check if the canary file exists
 		if [ -f "${CANARY_FILE}" ]; then
-			# Success! User did the action. Clean up the file for next time.
+			# Success!
 			rm -f "${CANARY_FILE}"
 			log "RESULT: passed"
 		else
 			log "RESULT: failed"
+			
+			# ALERT
+			echo "ALERT: Unauthorized login detected for user '${PAM_USER}' on $(date)" | \
+			mail -s "${MAIL_SUBJECT}" "${MAIL_DST}" 2>/dev/null
+
+			# SET session_pids
 			local session_pids=""
 
-			# Target processes tied ONLY to the specific terminal assigned to this login
-            if [ -n "${PAM_TTY}" ]; then
-                # session_pids=$(ps --tty "${PAM_TTY}" -o pid=)
-				session_pids=$(ps --ppid "${PPID}" -o pid=)
-            fi
+			if [[ -n "${PAM_TTY}" && "${PAM_TTY}" != "ssh" ]]; then
+				# Grab ONLY processes attached to this exact terminal window
+				session_pids=$(ps --tty "${PAM_TTY}" -o pid=)
+			fi
 
-			if [[ -z "${session_pids}" ]]; then
-                session_pids=$(ps --user "${PAM_USER}" -o pid=)
-            fi
+			# FALLBACK: Trace down from the specific PAM process tree safely
+			if [[ -z "${session_pids}" && -n "${PPID}" ]]; then
+				# $PPID at this point is the PID of the SSH daemon
+				# Therefore every SSH connection will be terminated
+				session_pids=$(ps --ppid "${PPID}" -o pid=)
+			fi
 
 			log "session_pids: $(echo ${session_pids})"
-
+			
+			# terminate session
 			if [[ -n "${session_pids}" ]]; then
 				
-				# Alert! Send email
-				echo "ALERT: Unauthorized login detected for user '${PAM_USER}' on $(date)" | \
-				mail -s "${MAIL_SUBJECT}" "${MAIL_DST}" 2>/dev/null
-
 				# STAGE 1: SIGTERM (15)
                 kill -15 ${session_pids} 2>/dev/null
 
