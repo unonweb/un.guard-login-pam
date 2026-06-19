@@ -1,3 +1,10 @@
+STATE
+=====
+
+- [x] Works when logged in via `machinectl shell <machine>`
+- [x] Works when logged in via `ssh user@host`
+
+
 NOTES
 =====
 
@@ -12,7 +19,7 @@ If the timer runs out, the sentinel performs its check and if this fails
 Ansible
 -------
 
-Use a dedicated ansible user.
+Make sure that ansible passes the sentinel, too.
 
 
 Processes
