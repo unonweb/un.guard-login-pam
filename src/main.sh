@@ -1,0 +1,74 @@
+#!/usr/bin/bash
+
+# script location
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE}")"
+SCRIPT_DIR=$(dirname -- "$(readlink -f "${BASH_SOURCE}")")
+SCRIPT_NAME=$(basename -- "$(readlink -f "${BASH_SOURCE}")")
+SCRIPT_PARENT=$(dirname "${SCRIPT_DIR}")
+
+PATH_CONFIG="${SCRIPT_PARENT}/config.cfg"
+PATH_DEFAULTS="${SCRIPT_PARENT}/defaults.cfg"
+
+# IMPORTS
+source "${SCRIPT_DIR}/lib/is_str_in_array.sh"
+
+function main { # $USER $PPID
+
+	# CHECK session type
+	if [[ "${PAM_TYPE}" != "open_session" ]]; then
+		exit 0
+	fi
+
+	# SOURCE config / defaults
+	if [[ -r ${PATH_CONFIG} ]]; then
+		source "${PATH_CONFIG}"
+	else
+		source "${PATH_DEFAULTS}"
+	fi
+
+	# CHECK array
+	if [[ "${#WATCH_USERS[@]}" -eq 0 ]]; then
+		exit 0
+	fi
+
+	# CHECK user
+	if ! is_str_in_array "${PAM_USER}" "${WATCH_USERS[@]}"; then
+		exit 0	 
+	fi
+
+	(
+		# Wait for the timeout period
+		sleep ${TIMEOUT}
+
+		# Check if the canary file exists
+		if [ -f "${CANARY_FILE}" ]; then
+			# Success! User did the action. Clean up the file for next time.
+			rm -f "${CANARY_FILE}"
+		else
+			local session_pids=$(ps -u "${PAM_USER}" -o pid=)
+
+			if [ -n "${session_pids}" ]; then
+				
+				# Alert! Send email
+				echo "ALERT: Unauthorized login detected for user '${PAM_USER}' on $(date)" | \
+				mail -s "${MAIL_SUBJECT}" "${MAIL_DST}" 2>/dev/null
+
+				# STAGE 1: Send SIGTERM (15) to request graceful closure
+                kill -15 ${session_pids} 2>/dev/null
+
+				# Give the processes 3 seconds to catch the signal and exit cleanly
+                sleep 3
+
+				# STAGE 2: Check if any processes survived SIGTERM
+                local remaining_pids=$(ps -u "${PAM_USER}" -o pid=)
+
+				if [ -n "${remaining_pids}" ]; then
+                    # Kill remaining processes
+                    kill -9 ${remaining_pids} 2>/dev/null
+                fi
+			fi
+		fi
+	) >/dev/null 2>&1 & # Forked to background, outputs silenced to prevent PAM hang-ups
+}
+
+main
