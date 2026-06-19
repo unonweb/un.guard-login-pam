@@ -13,7 +13,7 @@ PATH_DEFAULTS="${SCRIPT_PARENT}/defaults.cfg"
 source "${SCRIPT_DIR}/lib/is_str_in_array.sh"
 source "${SCRIPT_DIR}/lib/log.sh"
 
-function main { # $USER $PPID
+function main {
 
 	# CHECK session type
 	if [[ "${PAM_TYPE}" != "open_session" ]]; then
@@ -39,9 +39,10 @@ function main { # $USER $PPID
 
 	log "------"
 	log "PAM_TYPE: ${PAM_TYPE}"
-	log "TIMEOUT: ${TIMEOUT}"
-	log "PAM_TTY:${PAM_TTY}"
+	log "PAM_USER: ${PAM_USER}"
+	log "PAM_TTY: ${PAM_TTY}"
 	log "PPID: ${PPID}"
+	log "TIMEOUT: ${TIMEOUT}"
 
 	(
 		# Wait for the timeout period
