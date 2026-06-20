@@ -12,10 +12,23 @@ NOTES
 How it works
 ------------
 
-The script detaches itself from PAM's execution thread. 
-PAM does its checks and hands control over to the user's shell.
-In the meanwhile the script counts down silently in the background. 
-If the timer runs out, the sentinel performs its check and if this fails 
+The script is run by PAM on user authentication. 
+It detaches itself from PAM's execution thread.
+PAM does its checks independently the script (important to add `optional` - see *Install* section).
+In the meanwhile the script counts down silently in the background.
+When the timer runs out, the script performs its check. 
+If this fails the script first tries to terminate all processes belonging to this user session with SIGTERM.
+After a small grace period all remaining processes are killed.
+
+
+INSTALL
+=======
+
+```sh
+# /etc/pam.d/common-session
+# at the bottom:
+session optional pam_exec.so PATH_TO_YOUR_SCRIPT
+```
 
 Ansible
 -------
@@ -30,6 +43,30 @@ Make sure that ansible passes the sentinel, too.
     path: PATH_TO_YOUR_SECRET_FILE
     state: touch
 ```
+
+Hide disarm cmd from history
+----------------------------
+
+Hide it by prepending whitespace (if you forget that it will be logged!).
+
+### bash
+
+```sh
+# ~/.bashrc
+HISTCONTROL=ignorespace # or 
+HISTCONTROL=ignoreboth
+```
+
+### zsh
+
+```sh
+# ~/.zshrc
+setopt HIST_IGNORE_SPACE
+```
+
+
+NOTES TO MYSELF
+===============
 
 Processes
 ---------
@@ -55,33 +92,4 @@ After a small period **SIGKILL** is used to kill the remaining ones.
 
 ```sh
 trap "echo I am not leaving" SIGHUP SIGTERM
-```
-
-INSTALL
-=======
-
-```sh
-# /etc/pam.d/common-session
-# at the bottom:
-session optional pam_exec.so PATH_TO_YOUR_SCRIPT
-```
-
-Hide disarm cmd from history
-----------------------------
-
-Hide it by prepending whitespace (if you forget that it will be logged!).
-
-### bash
-
-```sh
-# ~/.bashrc
-HISTCONTROL=ignorespace # or 
-HISTCONTROL=ignoreboth
-```
-
-### zsh
-
-```sh
-# ~/.zshrc
-setopt HIST_IGNORE_SPACE
 ```
