@@ -6,6 +6,8 @@ SCRIPT_PATH="$(readlink -f "${TARGET_FILE}")" # -> /opt/un.sentinel-login-pam/sr
 SCRIPT_DIR=$(dirname "${SCRIPT_PATH}") # -> /opt/un.sentinel-login-pam/src
 SCRIPT_PARENT=$(dirname "${SCRIPT_DIR}") # -> /opt/un.sentinel-login-pam
 
+APP_NAME="${SCRIPT_PARENT##*/}"
+
 PATH_CONFIG="${SCRIPT_PARENT}/config.cfg"
 PATH_DEFAULTS="${SCRIPT_PARENT}/defaults.cfg"
 
